@@ -9,6 +9,7 @@ using .ResultLimits
 using .CourseTests
 
 const SLUGS = Dict(
+    "F01" => "first-pull-request",
     "F02" => "julia-arrays-and-tests",
     "F03-F04" => "vector-calculus-numerical-differentiation",
     "N01" => "linear-advection",
@@ -31,7 +32,7 @@ const USAGE = """
   julia --project=. $(joinpath("scripts", "course.jl")) start F02
   julia --project=. $(joinpath("scripts", "course.jl")) start F03-F04
 
-必要な教材が配布済みの、次の提出単位だけを開始できます。
+必要な教材が配布済みの任意の提出単位を開始できます。F00の環境確認にはpreflightを使用してください。
 """
 
 git_output(root, arguments...) = readchomp(Cmd(`git $(arguments)`; dir=root))
@@ -105,7 +106,7 @@ function start_exercise(root, id; persist_progress=save_progress)
     advanced = ProgressState(
         state.schema_version,
         state.ordered,
-        vcat(state.completed, [state.current]),
+        state.ordered[1:(findfirst(==(id), state.ordered) - 1)],
         id,
     )
     try

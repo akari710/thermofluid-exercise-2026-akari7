@@ -13,7 +13,7 @@ PRではテンプレートに沿って，diffとGitHub Actionsを確認してく
 
 教材更新は`upstream`から更新用branchへ通常のmergeで取り込み，更新PRを**Create a merge commit**で統合します．
 現在課題のテスト失敗は修正し，過去課題の警告も課題IDと原因を確認してください．
-作業環境を再準備した場合は，F00確認後に進捗をcommit・ローカルmergeしてから，`start`で既習課題を順に通過します．
+作業環境を再準備した場合は，F00確認後に進捗をcommit・ローカルmergeしてから，`start TASK_ID`で再開する課題を直接指定します．
 詳細は[課題ワークフロー](https://t2lab-it.github.io/thermofluid-exercise-2026/guides/workflow.html#previous-exercises)と[配布更新](https://t2lab-it.github.io/thermofluid-exercise-2026/guides/commands.html#material-updates)を参照してください．
 
 ## 外部からの提案

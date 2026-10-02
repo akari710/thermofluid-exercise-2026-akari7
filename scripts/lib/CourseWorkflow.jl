@@ -147,12 +147,10 @@ end
 
 function validate_transition(state::ProgressState, id)
     _validate(state)
-    current_index = findfirst(==(state.current), state.ordered)
-    current_index == length(state.ordered) &&
-        throw(ArgumentError("$(state.current)は最後の提出単位です"))
-    expected = state.ordered[current_index + 1]
-    id == expected ||
-        throw(ArgumentError("次の提出単位は`$expected`です。指定された値: `$id`"))
+    id in state.ordered ||
+        throw(ArgumentError("不明な提出単位です: `$id`"))
+    id != "F00" ||
+        throw(ArgumentError("F00の環境確認にはpreflightを使用してください"))
     nothing
 end
 
