@@ -5,6 +5,8 @@ include(joinpath(F00_REPO_ROOT, "exercises", "F00_environment", "run.jl"))
 using .F00Environment
 using .CourseWorkflow
 
+include(joinpath(@__DIR__, "course_transition_test.jl"))
+
 const WSL2_KERNEL = "5.15.167.4-microsoft-standard-WSL2"
 
 function f00_report(;

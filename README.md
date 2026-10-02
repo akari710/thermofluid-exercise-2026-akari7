@@ -75,8 +75,10 @@ julia --project=. -e 'using Pkg; Pkg.test()'
 
 過去課題の失敗は警告として現在課題まで検査を続け，現在課題の失敗はエラーとして扱います．
 詳しくは[テスト結果の読み方](https://t2lab-it.github.io/thermofluid-exercise-2026/guides/testing.html#test-results)を参照してください．
-`start`では課題の失敗を警告にして，次の提出単位へ進めます．
-既習課題は[再準備後の手順](https://t2lab-it.github.io/thermofluid-exercise-2026/guides/workflow.html#previous-exercises)で順に通過します．
+`start TASK_ID`では課題の失敗を警告にして，指定した任意の提出単位を開始できます．
+例として，`current = "F00"`から`julia --project=. scripts/course.jl start F02`でF02を直接開始できます．
+F00の環境確認には`preflight`を使用します．
+選択した課題より前を通過済みとして記録し，その課題以降は進捗記録から外します．
 `completed`と通過済みは進捗の記録です．
 課題の完了は，各課題ページの完了条件で確認してください．
 結果がある課題では，実行時に課題内の `results/` が作られます．

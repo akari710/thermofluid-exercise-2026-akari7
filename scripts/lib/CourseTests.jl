@@ -71,7 +71,8 @@ function run_course_tests(root; policy=:current, io=stderr)
     required = ["Project.toml", "Manifest.toml", "src/ThermofluidExercise.jl", "src/N06Advection.jl",
                 "src/N07Transport.jl", "scripts/lib/CourseWorkflow.jl",
                 "scripts/lib/ResultLimits.jl", "scripts/lib/CourseTests.jl",
-                "exercises/F00_environment/run.jl", "test/f00_preflight_test.jl"]
+                "exercises/F00_environment/run.jl", "test/f00_preflight_test.jl",
+                "test/course_transition_test.jl"]
     append!(required, [joinpath(unit_directory(unit), "tests.jl") for unit in units])
     for relative in required
         isfile(joinpath(root, relative)) || error("必須ファイルがありません: $relative")
