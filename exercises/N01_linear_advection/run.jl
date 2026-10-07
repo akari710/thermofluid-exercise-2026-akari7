@@ -13,22 +13,31 @@ export simulate, write_summary, make_plots, main
 # === 学生が実装する3つの関数 ===
 
 """
-    rectangular_initial_condition(x; base, plateau, plateau_start, plateau_end)
+    rectangular_initial_condition(
+        x::AbstractVector{<:Real};
+        base::Real = 1.0,
+        plateau::Real = 2.0,
+        plateau_start::Real = 0.5,
+        plateau_end::Real = 1.0,
+    )
 
-N01の移流実験で使う矩形状の初期分布を作る。
-各座標を読み、矩形領域の内側を`plateau`、外側を`base`にする。
+矩形領域の内側と外側で値を分けた初期分布を作る。
 
 # 引数
 
-- `x`: 狭義単調増加する座標の配列。
+- `x`: x方向の座標。入力は変更しない。
 - `base`: 矩形領域の外側の値。
 - `plateau`: 矩形領域の内側の値。
-- `plateau_start`: 矩形領域を始める座標。
-- `plateau_end`: 矩形領域を終える座標。
+- `plateau_start`: 矩形領域の開始座標。
+- `plateau_end`: 矩形領域の終了座標。
 
-# 戻り値
+# 返り値
 
-`x`と同じ長さを持つ初期値の配列を返す。`x`は変更しない。
+実装後は `x` と同じ長さの新しい配列。座標は変更しない。
+
+# 受講生のToDo
+
+TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
 """
 function rectangular_initial_condition(
     x::AbstractVector{<:Real};
@@ -48,24 +57,28 @@ function rectangular_initial_condition(
 end
 
 """
-    upwind_step!(u_new, u_old, c, dt, dx)
+    upwind_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
 
-正の移流速度に対する風上差分と陽Euler法で1ステップ進める。
-`u_old`だけを読み、計算結果を`u_new`へ書き換える。`u_old`は変更しない。
+正速度の風上差分と陽Euler法で内部点を更新する。
 
 # 引数
 
-- `u_new`: 新しい時刻の値を書き込む配列。
-- `u_old`: 現在時刻の値を読む配列。
+- `u_new`: 更新結果を書き込む配列。旧配列と重ならない独立したバッファ。
+- `u_old`: 更新前の値を読む配列。更新中は変更しない。
 - `c`: 正の移流速度。
-- `dt`: 時間刻み。
-- `dx`: 格子間隔。
+- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `dx`: x方向の有限な正の格子幅。
 
-# 戻り値
+# 返り値
 
-書き換えた`u_new`を返す。
+実装後は更新した `u_new`。両端は保持し、境界条件は呼出し側で適用する。
+
+# 受講生のToDo
+
+TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
 """
 function upwind_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
+    # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_step_inputs(u_new, u_old, c, dt, dx)
     # courantは1ステップで進む格子幅の割合を表すCFL数です。
     courant = c * dt / dx
@@ -83,24 +96,28 @@ function upwind_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
 end
 
 """
-    centered_step!(u_new, u_old, c, dt, dx)
+    centered_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
 
-意図的に不安定な中心差分と陽Euler法で1ステップ進める。
-`u_old`だけを読み、計算結果を`u_new`へ書き換える。`u_old`は変更しない。
+中心差分と陽Euler法で内部点を更新し、不安定化を比較する。
 
 # 引数
 
-- `u_new`: 新しい時刻の値を書き込む配列。
-- `u_old`: 現在時刻の値を読む配列。
+- `u_new`: 更新結果を書き込む配列。旧配列と重ならない独立したバッファ。
+- `u_old`: 更新前の値を読む配列。更新中は変更しない。
 - `c`: 正の移流速度。
-- `dt`: 時間刻み。
-- `dx`: 格子間隔。
+- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `dx`: x方向の有限な正の格子幅。
 
-# 戻り値
+# 返り値
 
-書き換えた`u_new`を返す。
+実装後は更新した `u_new`。`u_old` は保持する。
+
+# 受講生のToDo
+
+TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
 """
 function centered_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
+    # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_step_inputs(u_new, u_old, c, dt, dx)
     # courantは1ステップで進む格子幅の割合を表すCFL数です。
     courant = c * dt / dx
@@ -120,21 +137,21 @@ end
 # === 境界条件と時間発展の流れ ===
 
 """
-    apply_boundary!(u; left_value)
+    apply_boundary!(u::AbstractVector{<:Real}; left_value::Real = 1.0)
 
-1ステップ更新後の配列`u`へ境界条件を適用する。
-左端を`left_value`に固定し、右端を左隣と同じ値にしてゼロ勾配を表す。
+左端を固定値、右端を隣接点の値に設定する。
 
 # 引数
 
-- `u`: 境界値を書き換える配列。
-- `left_value`: 左端へ設定する値。
+- `u`: 境界を書き換える実数ベクトル。2点以上。
+- `left_value`: 左端の有限な固定値。
 
-# 戻り値
+# 返り値
 
-境界値を書き換えた`u`を返す。
+境界を書き換えた入力 `u`。
 """
 function apply_boundary!(u::AbstractVector{<:Real}; left_value::Real = 1.0)
+    # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_boundary_inputs(u, left_value)
     u[1] = left_value
     u[end] = u[end - 1]
@@ -142,28 +159,29 @@ function apply_boundary!(u::AbstractVector{<:Real}; left_value::Real = 1.0)
 end
 
 """
-    simulate(; scheme, nx, c, cfl, t_final)
+    simulate(;
+        scheme,
+        nx::Integer = 81,
+        c::Real = 1.0,
+        cfl::Real = 0.5,
+        t_final::Real = 0.5,
+    )
 
-指定した差分法でN01の時間発展を計算する。
-初期条件を作り、選択した1ステップ関数と境界条件を各ステップで順に適用する。
+初期条件・更新・境界条件を順に適用し、指定時刻まで計算する。
 
 # 引数
 
-- `scheme`: `:upwind`または`:centered`。
-- `nx`: 0から2までに置く格子点数。
+- `scheme`: 使用する差分法の識別子。
+- `nx`: x方向の格子点数。
 - `c`: 正の移流速度。
-- `cfl`: 1ステップで進む格子幅の割合。
-- `t_final`: 計算する最終時刻。
+- `cfl`: 指定するCFL数。
+- `t_final`: 計算の最終時刻。
 
-# 戻り値
+共通の入力検証後、初期条件と選択した差分TODOを呼ぶ。未実装エラーは呼出し元へ伝わる。
 
-次のフィールドを持つ名前付きタプルを返す。
+# 返り値
 
-- `x`: 座標。
-- `u0`: 初期値。
-- `u`: 最終時刻の値。
-- `dx`, `dt`, `steps`, `cfl`: 格子幅、時間刻み、ステップ数、実効CFL。
-- `minimum`, `maximum`: 最終値の最小値と最大値。
+`x, u0, u, dx, dt, steps, cfl, minimum, maximum` を持つ `NamedTuple`。初期配列と最終配列は独立する。
 """
 function simulate(;
     scheme,
@@ -172,15 +190,22 @@ function simulate(;
     cfl::Real = 0.5,
     t_final::Real = 0.5,
 )
+    # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_simulation_inputs(scheme, nx, c, cfl, t_final)
 
+
+    # 座標と格子幅を用意し、配列の添字との対応をそろえる。
     x = collect(range(0.0, 2.0; length = nx))
     dx = x[2] - x[1]
+
+    # 安定上限と到達する時刻に合わせて時間刻みを決める。
     nominal_dt = cfl * dx / c
     steps = ceil(Int, t_final / nominal_dt)
     dt = t_final / steps
     actual_cfl = c * dt / dx
 
+
+    # 初期値を保持し、更新に使う作業用配列を用意する。
     u0 = rectangular_initial_condition(x)
     u_old = copy(u0)
     u_new = similar(u_old)
@@ -194,6 +219,8 @@ function simulate(;
         u_old, u_new = u_new, u_old
     end
 
+
+    # 場と診断量をまとめて返し、呼出し側で比較や保存に使えるようにする。
     return (
         x = x,
         u0 = u0,
@@ -207,12 +234,27 @@ function simulate(;
     )
 end
 
-"""一つの差分法についてTOMLへ書き出す診断量を作る。"""
+"""
+    summary_section(scheme::String, result)
+
+初期値の範囲からの超過量を含め、1手法の診断をまとめる。
+
+# 引数
+
+- `scheme`: 使用する差分法の識別子。
+- `result`: シミュレーションの結果と診断量。
+
+# 返り値
+
+scheme・CFL・刻み・極値・overshoot/undershootとその判定を持つ辞書。
+"""
 function summary_section(scheme::String, result)
     initial_minimum, initial_maximum = extrema(result.u0)
     overshoot = max(result.maximum - initial_maximum, 0.0)
     undershoot = max(initial_minimum - result.minimum, 0.0)
     tolerance = 100eps(Float64) * max(abs(initial_minimum), abs(initial_maximum), 1.0)
+
+    # 場と診断量をまとめて返し、呼出し側で比較や保存に使えるようにする。
     return Dict(
         "scheme" => scheme,
         "cfl" => result.cfl,
@@ -227,7 +269,31 @@ function summary_section(scheme::String, result)
     )
 end
 
-"""N01の二つの比較計算を実行し、公式出力をすべて書き出す。"""
+"""
+    main(;
+        output_dir::AbstractString = DEFAULT_OUTPUT_DIR,
+        nx::Integer = 81,
+        c::Real = 1.0,
+        cfl::Real = 0.5,
+        t_final::Real = 0.5,
+    )
+
+風上と中心差分を比較し、診断TOMLと2つの図を保存する。
+
+# 引数
+
+- `output_dir`: 公式成果物を書き出すディレクトリ。
+- `nx`: x方向の格子点数。
+- `c`: 正の移流速度。
+- `cfl`: 指定するCFL数。
+- `t_final`: 計算の最終時刻。
+
+実行にはN01の3つのTODO実装が必要。計算やファイル保存の失敗は呼出し元へ伝わる。
+
+# 返り値
+
+`upwind, centered, summary_path, plot_paths` を持つ `NamedTuple`。指定ディレクトリへ成果物を書き出す。
+"""
 function main(;
     output_dir::AbstractString = DEFAULT_OUTPUT_DIR,
     nx::Integer = 81,
@@ -240,6 +306,8 @@ function main(;
     summary_path = write_summary(output_dir, upwind, centered)
     plot_paths = make_plots(output_dir, upwind, centered)
     println("N01の出力を書き込みました: $(abspath(output_dir))")
+
+    # 場と診断量をまとめて返し、呼出し側で比較や保存に使えるようにする。
     return (; upwind, centered, summary_path, plot_paths)
 end
 
