@@ -12,11 +12,13 @@ export gauss_seidel_step!, sor_step!, solve_relaxation
 
 # 引数
 
-- `u`: 場の値。配列の添字は座標の順に対応する。
+- `u`: 有限な浮動小数の節点場。x,y順。内部点をその場で更新する。
 - `f`: Poisson方程式の右辺行列。入力は変更しない。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
-- `omega`: 更新の緩和係数。許容範囲は下記の検証に従う。
+- `omega`: 有限な実数で0より大きく2より小さい緩和係数。
+
+u,fは同形状・1始まり・各軸3点以上で、記憶領域を共有しない。fは有限。不正入力は書込み前にArgumentError。
 
 # 返り値
 
@@ -24,7 +26,9 @@ export gauss_seidel_step!, sor_step!, solve_relaxation
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+uの内部点を教材の走査順で逐次更新し、同じsweepで既に更新した隣接値も使う。四辺は書き換えず、fを保持する。
+omega=1は提供のGauss–Seidel入口でも使う。入力・係数・omegaの検証は提供済み。
+[N09課題「Gauss–Seidel・SORの更新条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#relaxation-formulation)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function sor_step!(u, f, dx, dy; omega = 1.5)
     E.buffers(u, f)

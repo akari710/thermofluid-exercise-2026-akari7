@@ -1,4 +1,10 @@
-# N08/N09: 計算 → 独立診断 → 作図 → 完了検査 → 選択IDの出力反映。
+# N08/N09の提供済み一括入口。必修の編集先はsrc/N08N09Elliptic.jlです。
+# N08の4関数: apply_dirichlet! / laplace_jacobi_step! / laplace_residual! / residual_converged。
+# N09の追加2関数: poisson_jacobi_step! / poisson_residual!。解析・保存・作図は提供済みです。
+# tests.jlの配布必須テストを読み、同じファイルの「自作」枠に自分のテストを書きます。
+# 読む順: 課題N08/N09 → 必修関数とtests.jl → 提供のsolve_driver → simulate.jl → analyze.jl → plot.jl → このmain。
+# 任意の発展はextensions/neumann.jl / relaxation.jlと各発展テスト・実行入口を別に読みます。
+# 計算 → 保存場の独立診断 → 作図 → 完了検査を一時領域で終え、選択IDの出力へ反映します。
 
 module N08N09Run
 include("simulate.jl")
@@ -16,6 +22,9 @@ include("plot.jl")
     )
 
 一時領域で計算・診断・作図・完了検査を行い、公式出力を反映する。
+既定の `selection="all"` には必修6関数、`selection="N08"` にはN08の4関数の実装が必要。
+任意の `extensions/` はこの入口では実行しない。
+TODOの未実装や反復の非収束では生成・保存が止まり、公式出力の反映へ進まない。
 
 # 引数
 

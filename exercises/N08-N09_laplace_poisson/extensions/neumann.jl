@@ -123,13 +123,16 @@ pure(bc) = all(side->bc[side].kind == :neumann, SIDES)
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 
+提供ドライバからは各軸3点以上の節点数と検証済み格子幅を渡す。
+
 # 返り値
 
 実装後は(nx,ny)の重み行列。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+節点格子の面積重みを作り、内部・辺・角の半セルの違いを扱う。入力や既存の場を書き換えず、新しい重み行列を返す。
+[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)の端点重みを参照する。配布状態では未実装エラーで停止する。
 """
 function weights(nx, ny, dx, dy)
     # TODO_BEGIN weights
@@ -145,7 +148,7 @@ end
 
 # 引数
 
-- `u`: 場の値。配列の添字は座標の順に対応する。
+- `u`: 検証済みの節点場を表す浮動小数行列。x,y順。全要素を同じ定数だけずらす。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 
@@ -155,7 +158,8 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+weightsの半セル重みで平均を求め、全節点のuから同じ平均を引く。純Neumann解の定数の不定性を平均0で固定する。
+提供ドライバが初回と各更新後の基準を管理する。[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)を参照する。配布状態では未実装エラーで停止する。
 """
 function mean_zero!(u, dx, dy)
     # TODO_BEGIN mean_zero
@@ -176,13 +180,17 @@ end
 - `dy`: y方向の有限な正の格子幅。
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとvaluesを持ち、Neumann値は外向き法線微分。
 
+提供ドライバがvalidateで形状・有限性・境界を検証し、全辺Neumannの場合に呼ぶ。入力は変更しない。
+
 # 返り値
 
 実装後は右辺の重み付き積分と外向き境界流束の差。許容範囲を超える不適合はArgumentError。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+純Neumannの場合に、右辺の面積積分と外向き法線微分の辺積分を半セル重みで比較する。
+差を返し、教材のスケール付き許容値を超えればArgumentErrorで拒否する。fとbcは保持する。提供ドライバは反復前にこの検査を呼ぶ。
+[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)の離散可解条件を参照する。配布状態では未実装エラーで停止する。
 """
 function compatibility(f, dx, dy, bc)
     # TODO_BEGIN compatibility
@@ -223,9 +231,9 @@ end
 
 # 引数
 
-- `u`: 場の値。配列の添字は座標の順に対応する。
-- `i`: 1始まりの現在の添字。
-- `j`: y方向の1始まりの添字。
+- `u`: 検証済みの有限な節点場。x,y順、入力は変更しない。
+- `i`: x方向の現在節点、1からsize(u,1)までの整数。
+- `j`: y方向の現在節点、1からsize(u,2)までの整数。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとvaluesを持ち、Neumann値は外向き法線微分。
@@ -236,7 +244,9 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+内部ではuの隣接節点、領域外ではbcの外向き法線微分で消去したゴースト値を、西・東・南・北の順に返す。
+uとbcを保持する。固定節点の判定には提供のfixed_valueを使い、この関数を呼ばず指定値を扱う。
+[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)の四辺の外向き符号と角の扱いを参照する。配布状態では未実装エラーで停止する。
 """
 function neighbors(u, i, j, dx, dy, bc)
     # TODO_BEGIN neighbors
@@ -258,7 +268,10 @@ Neumann条件を含む重み付きJacobi更新を同じ旧場から計算する�
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとvaluesを持ち、Neumann値は外向き法線微分。
-- `omega`: 更新の緩和係数。許容範囲は下記の検証に従う。
+- `omega`: 有限な実数で0より大きく1より小さい緩和係数。
+
+新旧と右辺は同形状・1始まり・各軸3点以上の浮動小数行列で、互いに記憶領域を共有しない。
+旧場・右辺と境界値は有限。不正入力は書込み前に提供のvalidateでArgumentError。
 
 # 返り値
 
@@ -266,7 +279,9 @@ Neumann条件を含む重み付きJacobi更新を同じ旧場から計算する�
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+fixed_valueでDirichlet節点を固定し、他の全節点（Neumann辺・角を含む）を同じ旧場のneighborsから重み付きJacobi更新する。
+純Neumannでは更新後のnewをmean_zero!で調整する。入力・係数・omegaの検証は提供済み。旧場と右辺・境界値は保持する。
+[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function neumann_jacobi_step!(new, old, f, dx, dy, bc; omega = 2 / 3)
     ax, ay, d = validate(new, old, f, dx, dy, bc)
@@ -288,11 +303,14 @@ Dirichlet点を除き、Neumann境界を含む離散残差を書き込む。
 # 引数
 
 - `r`: 残差を書き込む行列。
-- `u`: 場の値。配列の添字は座標の順に対応する。
+- `u`: 有限な読み取り専用の節点場。x,y順。
 - `f`: Poisson方程式の右辺行列。入力は変更しない。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとvaluesを持ち、Neumann値は外向き法線微分。
+
+r,u,fは同形状・1始まり・各軸3点以上の浮動小数行列で、互いに記憶領域を共有しない。
+右辺・境界値も有限。不正入力は書込み前に提供のvalidateでArgumentError。
 
 # 返り値
 
@@ -300,7 +318,8 @@ Dirichlet点を除き、Neumann境界を含む離散残差を書き込む。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+Dirichlet節点の残差は0、それ以外はNeumann辺・角を含めneighborsを使って `r = f - Δ_h u` を評価し、r全体へ書く。
+入力・係数の検証は提供済み。uとf・bcを保持する。[N09課題「Neumannの定式化と実験条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N09.html#neumann-formulation)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function neumann_residual!(r, u, f, dx, dy, bc)
     ax, ay, d = validate(r, u, f, dx, dy, bc)
