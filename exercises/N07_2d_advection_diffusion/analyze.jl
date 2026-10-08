@@ -10,18 +10,23 @@ include("provided_support.jl")
 
 # 引数
 
-- `time`: 保存時刻列。
+- `time`: 0から始まる有限な狭義単調増加の保存時刻列。長さntは2以上。
 - `heat`: 時刻に対応する有限な熱量列。
-- `advective_integrals`: 流入を正とする移流熱輸送の(4,nt-1)行列。
-- `diffusive_integrals`: 流入を正とする拡散熱輸送の(4,nt-1)行列。
+- `advective_integrals`: 流入を正とする有限な移流熱輸送の(4,nt-1)行列。行順はwest,east,south,north、列は隣り合う保存時刻の区間。
+- `diffusive_integrals`: 同じ辺順・区間順の有限な拡散熱輸送の(4,nt-1)行列。
+
+入力4配列は変更しない。不正入力は提供のvalidate_budgetでArgumentError。
 
 # 返り値
 
-実装後はnet_input(nt-1)、cumulative_input(nt)、residual(nt)のNamedTuple。累積の先頭は0。
+実装後は `net_input(nt-1)`、`cumulative_input(nt)`、`residual(nt)` のNamedTuple。
+後二つの先頭は0。residualは初期熱量からの変化から累積流入を引いた列。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+保存区間ごとに4辺の移流・拡散積分を合計し、正味流入とその累積、初期熱量からの変化との差を再構成する。
+入力検証は提供済み。積分はsimulate.jlが各stepの辺別レート×刻みを保存区間に累積した値なので、ここで刻みを再び掛けない。
+[N07課題「辺別熱輸送と熱収支」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#heat-budget)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function heat_budget(time, heat, advective_integrals, diffusive_integrals)
     validate_budget(time, heat, advective_integrals, diffusive_integrals)

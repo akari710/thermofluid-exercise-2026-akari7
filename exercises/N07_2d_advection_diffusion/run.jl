@@ -1,4 +1,9 @@
-# N07: 計算 → 解析 → 作図 → 完了検査 → 公式8出力の反映。
+# N07の提供済み一括入口。数値・解析の編集先は次のファイルです。
+# src/N07Transport.jl: thermal_stable_timestep / thermal_fluxes! / thermal_step!と、burgers_stable_timestep / burgers_step!の5関数。
+# analyze.jl: heat_budget。tests.jl: 配布必須テストを読み、「自作」枠に自分のテストを書きます。
+# 読む順: 課題N07（面添字・熱収支） → 数値5関数とtests.jl → simulate.jl → analyze.jl → plot.jl → このmain。
+# 温度・Burgersの保存場と境界輸送を計算し、保存データを解析・作図します。
+# 計算 → 解析 → 作図 → 完了検査を一時領域で終え、公式8出力へ反映します。
 
 module N07Run
 include("simulate.jl")
@@ -15,6 +20,8 @@ include("plot.jl")
     )
 
 計算・解析・作図・完了検査を一時領域で終え、全成果物を反映する。
+既定実行には `src/N07Transport.jl` の数値5関数と `analyze.jl` の `heat_budget` の実装が必要。
+数値・解析TODOの未実装エラーでは反映へ進まず、既存出力を保持する。
 
 # 引数
 

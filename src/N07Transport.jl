@@ -260,11 +260,13 @@ x面とy面に対応する4つの流束バッファを作る。
 
 # 引数
 
-- `T`: 読み取り専用の旧温度行列。
+- `T`: 1始まり・各軸3点以上の浮動小数温度行列。形状だけを読み、変更しない。
 
 # 返り値
 
-adv_x,diff_xは(nx+1,ny)、adv_y,diff_yは(nx,ny+1)のゼロ行列を持つNamedTuple。
+`adv_x`, `diff_x` は(nx+1,ny)、`adv_y`, `diff_y` は(nx,ny+1)のゼロ行列を持つNamedTuple。
+温度はセル中心の `T[i,j]` でx,y順。x面i+1/2,jは `adv_x[i+1,j]` / `diff_x[i+1,j]`、y面i,j+1/2は `adv_y[i,j+1]` / `diff_y[i,j+1]` に対応する。
+x面の添字1とnx+1は西・東境界、y面の添字1とny+1は南・北境界で、面流束は正x・正y向きを正とする。
 """
 function flux_buffers(T)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -376,13 +378,17 @@ end
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとFloat64のvalueを持つ。
 - `safety`: 安定条件に掛ける安全係数。
 
+速度は有限実数、kappaは有限非負、0<safety<=1。境界の組合せは提供のvalidate_boundaryに従う。
+
 # 返り値
 
 実装後は有限な正のFloat64。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+移流と拡散の寄与に、固定温度・流入境界の半セルの係数を含めた安定上限を使い、safetyを適用する。
+境界・係数の検証、全係数0の拒否と返却刻みの検証は提供済み。thermal_rateは上限の照合用である。
+[N07課題「温度の流束・更新・境界条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#discretization)の安定刻みを参照する。配布状態では刻みの未実装エラーで停止する。
 """
 function thermal_stable_timestep(cx, cy, kappa, dx, dy, bc; safety = 0.8)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -400,8 +406,8 @@ end
 
 # 引数
 
-- `fluxes`: 書き換える面流束配列のNamedTuple。
-- `T`: 読み取り専用の旧温度行列。
+- `fluxes`: `adv_x`, `diff_x` が(nx+1,ny)、`adv_y`, `diff_y` が(nx,ny+1)の浮動小数行列を持つNamedTuple。全要素を書き込む。
+- `T`: 1始まり・各軸3点以上の有限な旧浮動小数温度行列。変更しない。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `cx`: x方向の移流速度。
@@ -409,13 +415,19 @@ end
 - `kappa`: 温度場の有限な非負拡散係数。
 - `bc`: west,east,south,north順の境界NamedTuple。各辺はkindとFloat64のvalueを持つ。
 
+温度はセル中心の `T[i,j]` でx,y順。x面i+1/2,jは `adv_x[i+1,j]` / `diff_x[i+1,j]`、y面i,j+1/2は `adv_y[i,j+1]` / `diff_y[i,j+1]` に対応する。
+x面の添字1とnx+1は西・東境界、y面の添字1とny+1は南・北境界で、面流束は正x・正y向きを正とする。
+温度と4流束配列は互いに記憶領域を共有しない。条件違反は書込み前にArgumentError。
+
 # 返り値
 
 実装後は書き換えたfluxes。正x・正y方向を正とし、旧温度Tは保持する。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+同じ旧温度から内部面・四境界面の移流と拡散を別々に求め、4配列の全要素へ書く。周期面の両端も確定する。
+入力・境界・バッファの検証は提供済み。境界値bcも保持する。[N07課題「温度の流束・更新・境界条件」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#discretization)の面位置と各境界の流束を参照する。
+配布状態では検証後に未実装エラーで停止する。
 """
 function thermal_fluxes!(fluxes, T, dx, dy; cx, cy, kappa, bc)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -433,9 +445,9 @@ end
 
 # 引数
 
-- `Tnew`: 更新結果を書き込む温度行列。
-- `Told`: 変更しない旧温度行列。
-- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `Tnew`: 全セルを書き換える1始まりの浮動小数温度行列。Toldと記憶領域を共有しない。
+- `Told`: 同形状・各軸3点以上の有限な旧浮動小数行列。x,y順で、変更しない。
+- `dt`: 有限な正の時間刻み。半セルを含む温度の合成安定条件を満たすこと。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `cx`: x方向の移流速度。
@@ -445,11 +457,14 @@ end
 
 # 返り値
 
-実装後は(;temperature=Tnew, boundary_rates=(;advective,diffusive))。辺別レートはwest,east,south,north順で流入を正とする。
+実装後は `(;temperature=Tnew, boundary_rates=(;advective,diffusive))`。
+advective,diffusiveはそれぞれwest,east,south,northを持つNamedTupleで、辺別レートは流入を正とする。Toldとbcは保持する。
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+Common.validate_buffersを再利用し、同じ旧温度からthermal_fluxes!で面流束を一度構築して、全セルの新温度と辺別レートに使う。
+面流束は正x・正y向きだが、返すレートは流入を正とするため、東・北の符号を反転し、面の長さを含めて辺ごとに集計する。
+入力・境界・安定条件の検証は提供済み。Toldとbcを保持し、[N07課題「辺別熱輸送と熱収支」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#heat-budget)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function thermal_step!(Tnew, Told, dt, dx, dy; cx, cy, kappa, bc)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -527,12 +542,14 @@ end
 
 # 引数
 
-- `u`: 場の値。配列の添字は座標の順に対応する。
-- `v`: 読み取り専用のy方向の旧速度行列。
+- `u`: 有限な旧x速度の浮動小数行列。x,y順、1始まり・各軸3点以上。
+- `v`: 同形状の有限な旧y速度行列。uと記憶領域を共有せず、両方を保持する。
 - `nu`: Burgers速度の有限な非負粘性係数。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `safety`: 安定条件に掛ける安全係数。
+
+0<safety<=1で、全速度・粘性を同時に0にはしない。不正入力はArgumentError。
 
 # 返り値
 
@@ -540,7 +557,9 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+このステップの旧二成分速度の局所値と粘性から合成上限を求め、safetyを適用する。初期速度の上限を固定して使わない。
+旧行列・粘性・格子幅の検証、全速度・粘性0の拒否と返却刻みの検証は提供済み。u,vを保持する。
+[N07課題「Burgersの定式化」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#burgers-formulation)を参照する。配布状態では刻みの未実装エラーで停止する。
 """
 function burgers_stable_timestep(u, v, nu, dx, dy; safety = 0.8)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -560,12 +579,14 @@ end
 
 - `unew`: 更新後のx速度を書き込む行列。
 - `vnew`: 更新後のy速度を書き込む行列。
-- `uold`: 変更しない旧x速度。
-- `vold`: 変更しない旧y速度。
-- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `uold`: 有限な旧x速度の浮動小数行列。x,y順、1始まり・各軸3点以上。
+- `vold`: 同形状の有限な旧y速度の浮動小数行列。
+- `dt`: 有限な正の時間刻み。旧二成分速度と粘性の合成安定条件を満たすこと。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `nu`: Burgers速度の有限な非負粘性係数。
+
+新旧4行列は同形状で、互いに記憶領域を共有しない。不正入力は書込み前にArgumentError。
 
 # 返り値
 
@@ -573,7 +594,9 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+共通バッファ検証と周期左右隣接を再利用し、旧二成分の符号で各方向の風上を選び、拡散と合わせて両新成分の全点へ書く。
+二成分とも同じ旧uold,voldを読む。4配列は同じ記憶領域を共有せず、一方の新成分を他方の更新へ使わない。
+入力・独立性・安定条件の検証は提供済み。温度の面流束APIとは別の更新である。[N07課題「Burgersの定式化」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N07.html#burgers-formulation)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function burgers_step!(unew, vnew, uold, vold, dt, dx, dy; nu)
     # 計算や書込みの前に、入力条件をまとめて確認する。
