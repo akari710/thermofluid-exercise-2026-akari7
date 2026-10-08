@@ -1,3 +1,6 @@
+# N01のテスト枠。必須テストと自作テストの両方を受講生が実装します。
+# 各TODOで入力と独立した期待値を選び、配列全体・境界・安定性を確認します。
+
 using Test
 
 if !isdefined(Main, :N01LinearAdvection)
