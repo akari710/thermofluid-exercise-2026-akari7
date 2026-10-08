@@ -68,7 +68,8 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+x,y方向の移流の寄与を足した合成CFL上限へsafetyを適用し、時間刻みを求める。
+入力検証と計算後のFloat64変換・有限正値の検証は提供済み。[N06課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N06.html#discretization)を参照する。配布状態では刻みの未実装エラーで停止する。
 """
 function stable_timestep(cx, cy, dx, dy; safety = 0.8)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -95,9 +96,9 @@ end
 
 # 引数
 
-- `u_new`: 更新結果を書き込む配列。旧配列と重ならない独立したバッファ。
-- `u_old`: 更新前の値を読む配列。更新中は変更しない。
-- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `u_new`: 全点を書き込む浮動小数行列。旧場と記憶領域を共有しない。
+- `u_old`: 同形状の有限な旧行列。u_old[i,j]はx[i],y[j]に対応し、変更しない。
+- `dt`: 有限な正の時間刻み。二方向の合成CFLが1以下となること。
 - `dx`: x方向の有限な正の格子幅。
 - `dy`: y方向の有限な正の格子幅。
 - `cx`: x方向の移流速度。
@@ -113,7 +114,9 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+各軸の周期左隣を使い、N01の風上更新を二方向へ拡張して全点を同じ旧行列から更新する。
+新旧は同じ記憶領域を共有しない。Common.validate_buffersと周期添字・流束の共通APIを実装してから利用する。
+速度・刻み・合成CFLの検証、格子点数nx,nyの取得は提供済み。[N06課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N06.html#discretization)を参照する。配布状態では共通検証または更新の未実装エラーで停止する。
 """
 function advection_step!(u_new, u_old, dt, dx, dy; cx = 1.0, cy = 0.5)
     u_new isa AbstractMatrix && u_old isa AbstractMatrix ||

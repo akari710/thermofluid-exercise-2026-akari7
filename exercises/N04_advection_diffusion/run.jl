@@ -20,9 +20,9 @@ export SELECTED_MODEL,
 
 # 引数
 
-- `u`: 場の値。配列の添字は座標の順に対応する。
+- `u`: 有限な実数スカラー。非線形モデルでは非負とする。
 - `model`: `:linear` または `:nonlinear` の選択モデル。
-- `speed`: 線形モデルの移流速度。非線形モデルでは場の値を速度として使う。
+- `speed`: 線形モデルでは有限な正の実数。非線形モデルでは場の値を速度として使う。
 
 共通検証で不正入力を拒否する。SELECTED_MODELで選択したモデルのTODOを実装する。
 
@@ -32,7 +32,8 @@ export SELECTED_MODEL,
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+SELECTED_MODELで選んだ枝だけに、N01の線形流束またはN02のBurgers流束を移す。スカラー1点の入力を扱う。
+モデル・有限性・速度の検証は提供済み。配布状態の `:unselected` はモデル検証で拒否され、選択済みの枝も未完成なら既存の未実装エラーで停止する。
 """
 function advective_flux(u; model = SELECTED_MODEL, speed = 1.0)
     # 計算や書込みの前に、入力条件をまとめて確認する。
@@ -56,12 +57,12 @@ end
 
 # 引数
 
-- `max_speed`: 場から評価した最大移流速度。
+- `max_speed`: 有限な非負の最大移流速度。
 - `dx`: x方向の有限な正の格子幅。
-- `diffusivity`: 拡散係数。
-- `safety`: 安定条件に掛ける安全係数。
+- `diffusivity`: 有限な非負の拡散係数。
+- `safety`: 有限な実数で0より大きく1以下の安全係数。
 
-共通検証で不正入力を拒否する。SELECTED_MODELで選択したモデルのTODOを実装する。
+速度と拡散係数を同時に0にはしない。不正入力は提供検証でArgumentError。刻み選択自体はモデル選択に依存しない。
 
 # 返り値
 
@@ -69,7 +70,8 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+移流と拡散を別々に制限するのでなく、両者の寄与を足した安定上限にsafetyを適用して刻みを返す。
+入力検証は提供済み。[N04課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N04.html#discretization)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function stable_timestep(max_speed, dx, diffusivity; safety = 0.8)
     validate_timestep_inputs(max_speed, dx, diffusivity, safety)
@@ -93,16 +95,16 @@ end
 
 # 引数
 
-- `u_new`: 更新結果を書き込む配列。旧配列と重ならない独立したバッファ。
-- `u_old`: 更新前の値を読む配列。更新中は変更しない。
-- `dt`: 時間刻み。指定可能な範囲は下記の検証に従う。
+- `u_new`: 全点を書き込む1始まりの浮動小数ベクトル。旧場と記憶領域を共有しない。
+- `u_old`: 同長・3点以上の有限な旧浮動小数ベクトル。変更しない。
+- `dt`: 有限な正の時間刻み。移流・拡散の合成安定条件を満たすこと。
 - `dx`: x方向の有限な正の格子幅。
-- `diffusivity`: 拡散係数。
+- `diffusivity`: 有限な非負の拡散係数。
 - `model`: `:linear` または `:nonlinear` の選択モデル。
 - `advection`: 移流を含めるかを表す `Bool`。
 - `speed`: 線形モデルの移流速度。非線形モデルでは場の値を速度として使う。
 
-共通検証で不正入力を拒否する。SELECTED_MODELで選択したモデルのTODOを実装する。
+モデルと速度・配列・合成安定条件の違反は書込み前に提供検証でArgumentError。配布状態のSELECTED_MODEL=:unselectedも拒否する。
 
 # 返り値
 
@@ -110,7 +112,9 @@ end
 
 # 受講生のToDo
 
-TODOコメントの指示に沿って数値処理を実装する。配布状態では未実装エラーで停止する。
+提供ループの全点で、周期の左右隣接を使い、移流と拡散を同じ旧ベクトルから評価して新ベクトルへ書く。
+新旧は同じ記憶領域を共有せず、更新中の新値を旧値の代わりに読まない。入力・合成安定条件の検証は提供済み。
+移流を含める場合は選択モデルのadvective_fluxも必要。advection=falseでは拡散だけを扱う。[N04課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N04.html#discretization)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
 function advection_diffusion_step!(
     u_new,
