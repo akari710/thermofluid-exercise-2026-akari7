@@ -27,7 +27,7 @@ function student_greeting(name::AbstractString)::String
     isempty(normalized_name) && throw(ArgumentError("名前を空にはできません"))
 
     # TODO(F01): `Hello, <normalized_name>!`を返す処理を実装する。
-    error("未実装 F01: student_greeting")
+    return "Hello, $(normalized_name)!"
 end
 
 """
@@ -46,7 +46,7 @@ end
 
 生成した挨拶の `String`。同じ文字列を `io` へ改行付きで表示する。
 """
-function main(name::AbstractString = "student"; io = stdout)
+function main(name::AbstractString="student"; io=stdout)
     message = student_greeting(name)
     println(io, message)
     message
