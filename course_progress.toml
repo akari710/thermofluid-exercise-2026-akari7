@@ -1,4 +1,4 @@
-completed = ["F00", "F01"]
-current = "F02"
+completed = ["F00", "F01", "F02"]
+current = "F03-F04"
 ordered = ["F00", "F01", "F02", "F03-F04", "N01", "N02", "N03", "N04", "N05-N06", "N07", "N08-N09"]
 schema_version = 2
