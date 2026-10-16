@@ -98,7 +98,7 @@ end
 function forward_difference(f, x, h)
     validate_scalar_input(x, h)
     # TODO(F04): 前進差分商を実装する。
-    error("未実装 F04: forward_difference")
+    return (f(x + h) - f(x)) / h
 end
 
 """
@@ -125,7 +125,7 @@ end
 function backward_difference(f, x, h)
     validate_scalar_input(x, h)
     # TODO(F04): 後退差分商を実装する。
-    error("未実装 F04: backward_difference")
+    return (f(x) - f(x - h)) / h
 end
 
 """
@@ -152,7 +152,7 @@ end
 function centered_difference(f, x, h)
     validate_scalar_input(x, h)
     # TODO(F04): 中心差分商を実装する。
-    error("未実装 F04: centered_difference")
+    return (f(x + h) - f(x - h)) / (2*h)
 end
 
 """
@@ -180,7 +180,7 @@ function convergence_study(f, derivative, x, spacings)
         throw(ArgumentError("spacingsには少なくとも2個の値が必要です"))
     all(h -> h isa Real && !(h isa Bool) && isfinite(h) && h > 0, spacings) ||
         throw(ArgumentError("spacingsは有限な正の実数にしてください"))
-    all(index -> spacings[index] > spacings[index + 1], 1:(length(spacings) - 1)) ||
+    all(index -> spacings[index] > spacings[index+1], 1:(length(spacings)-1)) ||
         throw(ArgumentError("spacingsは狭義単調減少にしてください"))
 
     exact = derivative(x)
@@ -188,7 +188,7 @@ function convergence_study(f, derivative, x, spacings)
     forward_errors = [abs(forward_difference(f, x, h) - exact) for h in spacings]
     backward_errors = [abs(backward_difference(f, x, h) - exact) for h in spacings]
     centered_errors = [abs(centered_difference(f, x, h) - exact) for h in spacings]
-    ratios(errors) = errors[1:(end - 1)] ./ errors[2:end]
+    ratios(errors) = errors[1:(end-1)] ./ errors[2:end]
     forward_ratios = ratios(forward_errors)
     backward_ratios = ratios(backward_errors)
     centered_ratios = ratios(centered_errors)
@@ -200,9 +200,9 @@ function convergence_study(f, derivative, x, spacings)
         forward_ratios,
         backward_ratios,
         centered_ratios,
-        forward_orders = log2.(forward_ratios),
-        backward_orders = log2.(backward_ratios),
-        centered_orders = log2.(centered_ratios),
+        forward_orders=log2.(forward_ratios),
+        backward_orders=log2.(backward_ratios),
+        centered_orders=log2.(centered_ratios),
     )
 end
 
@@ -225,7 +225,7 @@ end
 
 指定方向の偏微分の近似値。
 """
-function centered_partial(f, point, axis, h; differentiator = centered_difference)
+function centered_partial(f, point, axis, h; differentiator=centered_difference)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_point(point)
     h isa Real && !(h isa Bool) && isfinite(h) && h > 0 ||
@@ -258,11 +258,11 @@ function curl_gradient_residual(point, h)
     validate_point(point)
     (
         centered_partial(p -> gradient_scalar(p)[3], point, 2, h) -
-        centered_partial(p -> gradient_scalar(p)[2], point, 3, h),
+            centered_partial(p -> gradient_scalar(p)[2], point, 3, h),
         centered_partial(p -> gradient_scalar(p)[1], point, 3, h) -
-        centered_partial(p -> gradient_scalar(p)[3], point, 1, h),
+            centered_partial(p -> gradient_scalar(p)[3], point, 1, h),
         centered_partial(p -> gradient_scalar(p)[2], point, 1, h) -
-        centered_partial(p -> gradient_scalar(p)[1], point, 2, h),
+            centered_partial(p -> gradient_scalar(p)[1], point, 2, h),
     )
 end
 
@@ -315,7 +315,7 @@ function product_divergence_residual(point, h)
     )
     rhs =
         sum(vector_field(point) .* gradient_scalar(point)) +
-        scalar_field(point) * divergence_vector(point)
+            scalar_field(point) * divergence_vector(point)
     lhs - rhs
 end
 
@@ -340,11 +340,11 @@ function curl_curl_residual(point, h)
     validate_point(point)
     lhs = (
         centered_partial(p -> curl_vector(p)[3], point, 2, h) -
-        centered_partial(p -> curl_vector(p)[2], point, 3, h),
+            centered_partial(p -> curl_vector(p)[2], point, 3, h),
         centered_partial(p -> curl_vector(p)[1], point, 3, h) -
-        centered_partial(p -> curl_vector(p)[3], point, 1, h),
+            centered_partial(p -> curl_vector(p)[3], point, 1, h),
         centered_partial(p -> curl_vector(p)[2], point, 1, h) -
-        centered_partial(p -> curl_vector(p)[1], point, 2, h),
+            centered_partial(p -> curl_vector(p)[1], point, 2, h),
     )
     lhs .- (gradient_divergence_vector(point) .- laplacian_vector(point))
 end
@@ -367,14 +367,14 @@ end
 function verify_vector_identities(n)
     n isa Integer && !(n isa Bool) && n >= 5 && isodd(n) ||
         throw(ArgumentError("nは5以上の奇数にしてください"))
-    coordinates = range(-1.0, 1.0; length = Int(n))
+    coordinates = range(-1.0, 1.0; length=Int(n))
     h = step(coordinates)
     curl_gradient = 0.0
     divergence_curl = 0.0
     product_divergence = 0.0
     curl_curl = 0.0
     # Compare maxima on a common physical region as the grid is refined.
-    interior = filter(x -> abs(x) <= 0.75, coordinates[2:(end - 1)])
+    interior = filter(x -> abs(x) <= 0.75, coordinates[2:(end-1)])
     for x in interior, y in interior, z in interior
 
         point = (x, y, z)
