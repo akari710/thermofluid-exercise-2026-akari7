@@ -202,53 +202,87 @@ function render_plots(data,directory)
     styles = (:solid,:dash,:dot,:dashdot,:dashdotdot)
     color(id) = colors[findfirst(==(id),ids)]
     style(id) = styles[findfirst(==(id),ids)]
+    names = ("Forward Euler","Midpoint RK2","Classical RK4","Backward Euler","Crank-Nicolson")
+    name(id) = names[findfirst(==(id),ids)]
 
     # 実験A: 横軸dt、縦軸誤差。直線の傾きが時間積分の次数に対応する。
     p = plot(;xscale=:log10,yscale=:log10,xlabel="dt",ylabel="Absolute error at T = 1",
         xticks=([1/64,1/32,1/16,1/8],["1/64","1/32","1/16","1/8"]),
-        title="Time convergence: y' = -y",legend=:topleft,size=(900,600))
+        title="Time convergence: y' = -y",legend=:bottomright,size=(900,600),
+        left_margin=8Plots.mm,bottom_margin=6Plots.mm,legendfontsize=11)
     for row in data["time_convergence"]
         id = row["method"]
-        plot!(p,row["dt"],row["errors"];marker=:circle,color=color(id),linestyle=style(id),label=id)
+        plot!(p,row["dt"],row["errors"];marker=:circle,color=color(id),linestyle=style(id),label=name(id))
     end
     savefig(p,joinpath(directory,OUTPUT_FILES[1]))
 
-    # 実験B: 細かいdtと粗いdtを、上下2行に並べる。
+    # 実験B: 左列を細かいdt、右列を粗いdtとし、比較する量を上下に揃える。
     x = data["diffusion_problem"]["x"]
     lambda39 = data["diffusion_problem"]["eigenvalues"][2]
-    panels = []
-    for N in (128,4)
+    markers = (:circle,:rect,:diamond,:utriangle,:dtriangle)
+    marker(id) = markers[findfirst(==(id),ids)]
+    columns = []
+    for (column,N) in enumerate((128,4))
         rows = filter(r->r["N"]==N,data["diffusion"])
         fo = first(rows)["Fo"]
+        T = first(rows)["final_time"]
+        time_limits = (-0.03*T,1.03*T)
+        reference_times = range(0.0,T;length=401)
+        reference_mode = 0.01exp.(lambda39.*reference_times)
+        letters = column==1 ? ("a","c","e") : ("b","d","f")
 
-        # 左から最終分布、全手法の高周波係数、陰解法の高周波係数。
-        final = plot(x,first(rows)["reference_state"];color=:black,linestyle=:dash,linewidth=2,
-            label="semidiscrete exact",xlabel="x",ylabel="u(x, 0.1)",title="Final: N=$N, Fo=$fo",legend=:topright)
-        mode = plot(;xlabel="t",ylabel="Mode 39 coefficient",title="All methods: N=$N",
-            yscale=N==128 ? :log10 : :identity,legend=:topleft)
-        times = first(rows)["times"]
-        implicit = plot(times,0.01exp.(lambda39.*times);color=:black,linestyle=:dash,
-            label="semidiscrete exact",xlabel="t",ylabel="Mode 39 coefficient",
-            title="Implicit methods: N=$N",yscale=N==128 ? :log10 : :identity,legend=:topright)
+        # 上から最終分布、全手法の高周波係数、陰解法の高周波係数。
+        final = plot(;xlabel="x",ylabel="u(x, 0.1)",
+            title="($(letters[1])) Final profile\nN = $N, Fo = $fo",legend=false)
+        mode = plot(;xlabel="t",ylabel="Mode 39 coefficient",
+            title="($(letters[2])) All methods: N = $N",
+            yscale=N==128 ? :log10 : :identity,legend=false)
+        implicit = plot(;xlabel="t",ylabel="Mode 39 coefficient",
+            title="($(letters[3])) Implicit methods: N = $N",
+            yscale=N==128 ? :log10 : :identity,legend=false)
+        for panel in (mode,implicit)
+            plot!(panel;xlims=time_limits,
+                xticks=([0.0,0.025,0.05,0.075,0.1],["0","0.025","0.05","0.075","0.1"]))
+            N==4 && hline!(panel,[0.0];color=:gray65,linewidth=1,label="")
+        end
 
         for row in rows
             id = row["method"]
-            plot!(final,x,row["final_state"];label=id,color=color(id),linestyle=style(id))
-            plot!(mode,row["times"],row["high_mode_coefficients"];label=id,color=color(id),
-                linestyle=style(id),marker=N==4 ? :circle : :none)
+            plot!(final,x,row["final_state"];label="",color=color(id),linestyle=style(id),linewidth=2)
+            plot!(mode,row["times"],row["high_mode_coefficients"];label="",color=color(id),
+                linestyle=style(id),linewidth=2.2,marker=N==4 ? marker(id) : :none,
+                markersize=5,markercolor=:white,markerstrokecolor=color(id),markerstrokewidth=1.5)
             if id in ("backward_euler","crank_nicolson")
-                plot!(implicit,row["times"],row["high_mode_coefficients"];label=id,color=color(id),
-                    linestyle=style(id),marker=N==4 ? :circle : :none)
+                plot!(implicit,row["times"],row["high_mode_coefficients"];label="",color=color(id),
+                    linestyle=style(id),linewidth=2.2,marker=N==4 ? marker(id) : :none,
+                    markersize=5,markercolor=:white,markerstrokecolor=color(id),markerstrokewidth=1.5)
             end
         end
 
-        # 陰解法だけの表示で、小さいCNの符号交代を陽解法の増幅と同時に読める。
-        push!(panels,final,mode,implicit)
+        plot!(final,x,first(rows)["reference_state"];color=:black,linestyle=:dash,linewidth=2,label="")
+        for panel in (mode,implicit)
+            plot!(panel,reference_times,reference_mode;color=:black,linestyle=:dash,linewidth=2,label="")
+        end
+        push!(columns,(final,mode,implicit))
     end
 
-    # 最終分布の大きな増幅と、小さいCNの符号交代の両方を読める配置にする。
-    p = plot(panels...;layout=(2,3),size=(1800,1000),
-        bottom_margin=6Plots.mm,left_margin=12Plots.mm,legendfontsize=7)
+    # 共通凡例を上にまとめ、長い線見本で線種を判別できるようにする。
+    key = plot(;xlims=(0,3),ylims=(0,2),showaxis=false,grid=false,legend=false,
+        ticks=false,top_margin=0Plots.mm,bottom_margin=0Plots.mm)
+    active_ids = [row["method"] for row in data["time_convergence"]]
+    for (i,id) in enumerate(vcat(["reference"],active_ids))
+        col = (i-1)%3
+        y = 1.5-div(i-1,3)
+        exact = id=="reference"
+        plot!(key,[col+0.02,col+0.24],[y,y];color=exact ? :black : color(id),
+            linestyle=exact ? :dash : style(id),linewidth=2.2,label="")
+        annotate!(key,col+0.29,y,text(exact ? "Semidiscrete exact" : name(id),11,:left))
+    end
+    panels = [columns[col][row] for row in 1:3 for col in 1:2]
+    arrangement = @layout [key{0.08h}; grid(3,2)]
+    p = plot(key,panels...;layout=arrangement,size=(1200,1500),
+        bottom_margin=6Plots.mm,left_margin=8Plots.mm,right_margin=4Plots.mm,
+        titlefontsize=13,guidefontsize=12,tickfontsize=10,gridalpha=0.15)
     savefig(p,joinpath(directory,OUTPUT_FILES[2]))
 end
 
