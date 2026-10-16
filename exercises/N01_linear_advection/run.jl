@@ -44,10 +44,10 @@ export simulate, write_summary, make_plots, main
 """
 function rectangular_initial_condition(
     x::AbstractVector{<:Real};
-    base::Real = 1.0,
-    plateau::Real = 2.0,
-    plateau_start::Real = 0.5,
-    plateau_end::Real = 1.0,
+    base::Real=1.0,
+    plateau::Real=2.0,
+    plateau_start::Real=0.5,
+    plateau_end::Real=1.0,
 )
     validate_initial_condition_inputs(x, base, plateau, plateau_start, plateau_end)
 
@@ -56,7 +56,16 @@ function rectangular_initial_condition(
     矩形状の初期分布を実装する。
     各座標xiがplateau_start <= xi <= plateau_endを満たすか判定する。
     =#
-    error("未実装 N01: rectangular_initial_condition")
+    u = similar(x)
+    for i in eachindex(x)
+        xi = x[i]
+        if plateau_start <= xi <= plateau_end
+            u[i] = plateau
+        else
+            u[i] = base
+        end
+    end
+    return u
 end
 
 """
@@ -91,13 +100,13 @@ function upwind_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
     courant = c * dt / dx
     # copyto!で古い値を複製し、内部を更新する間も両端点の値を保ちます。
     copyto!(u_new, u_old)
-    for i in 2:(length(u_old) - 1)
+    for i in 2:(length(u_old)-1)
         #=
         TODO(N01):
         風上差分と陽Euler法による1ステップの更新を実装する。
         授業ページの式を、iとi - 1の添字を使ってコードへ写す。
         =#
-        error("未実装 N01: upwind_step!")
+        u_new[i] = u_old[i] - courant * (u_old[i] - u_old[i-1])
     end
     return u_new
 end
@@ -134,13 +143,13 @@ function centered_step!(u_new, u_old, c::Real, dt::Real, dx::Real)
     courant = c * dt / dx
     # copyto!で古い値を複製し、内部を更新する間も両端点の値を保ちます。
     copyto!(u_new, u_old)
-    for i in 2:(length(u_old) - 1)
+    for i in 2:(length(u_old)-1)
         #=
         TODO(N01):
         中心差分と陽Euler法による1ステップの更新を実装する。
         授業ページの式を、i - 1とi + 1の添字を使ってコードへ写す。
         =#
-        error("未実装 N01: centered_step!")
+        u_new[i] = u_old[i] - courant * (u_old[i+1] - u_old[i-1]) / 2
     end
     return u_new
 end
@@ -161,11 +170,11 @@ end
 
 境界を書き換えた入力 `u`。
 """
-function apply_boundary!(u::AbstractVector{<:Real}; left_value::Real = 1.0)
+function apply_boundary!(u::AbstractVector{<:Real}; left_value::Real=1.0)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_boundary_inputs(u, left_value)
     u[1] = left_value
-    u[end] = u[end - 1]
+    u[end] = u[end-1]
     return u
 end
 
@@ -196,17 +205,17 @@ end
 """
 function simulate(;
     scheme,
-    nx::Integer = 81,
-    c::Real = 1.0,
-    cfl::Real = 0.5,
-    t_final::Real = 0.5,
+    nx::Integer=81,
+    c::Real=1.0,
+    cfl::Real=0.5,
+    t_final::Real=0.5,
 )
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_simulation_inputs(scheme, nx, c, cfl, t_final)
 
 
     # 座標と格子幅を用意し、配列の添字との対応をそろえる。
-    x = collect(range(0.0, 2.0; length = nx))
+    x = collect(range(0.0, 2.0; length=nx))
     dx = x[2] - x[1]
 
     # 安定上限と到達する時刻に合わせて時間刻みを決める。
@@ -233,15 +242,15 @@ function simulate(;
 
     # 場と診断量をまとめて返し、呼出し側で比較や保存に使えるようにする。
     return (
-        x = x,
-        u0 = u0,
-        u = u_old,
-        dx = dx,
-        dt = dt,
-        steps = steps,
-        cfl = actual_cfl,
-        minimum = minimum(u_old),
-        maximum = maximum(u_old),
+        x=x,
+        u0=u0,
+        u=u_old,
+        dx=dx,
+        dt=dt,
+        steps=steps,
+        cfl=actual_cfl,
+        minimum=minimum(u_old),
+        maximum=maximum(u_old),
     )
 end
 
@@ -306,14 +315,14 @@ end
 `upwind, centered, summary_path, plot_paths` を持つ `NamedTuple`。指定ディレクトリへ成果物を書き出す。
 """
 function main(;
-    output_dir::AbstractString = DEFAULT_OUTPUT_DIR,
-    nx::Integer = 81,
-    c::Real = 1.0,
-    cfl::Real = 0.5,
-    t_final::Real = 0.5,
+    output_dir::AbstractString=DEFAULT_OUTPUT_DIR,
+    nx::Integer=81,
+    c::Real=1.0,
+    cfl::Real=0.5,
+    t_final::Real=0.5,
 )
-    upwind = simulate(; scheme = :upwind, nx, c, cfl, t_final)
-    centered = simulate(; scheme = :centered, nx, c, cfl, t_final)
+    upwind = simulate(; scheme=:upwind, nx, c, cfl, t_final)
+    centered = simulate(; scheme=:centered, nx, c, cfl, t_final)
     summary_path = write_summary(output_dir, upwind, centered)
     plot_paths = make_plots(output_dir, upwind, centered)
     println("N01の出力を書き込みました: $(abspath(output_dir))")
