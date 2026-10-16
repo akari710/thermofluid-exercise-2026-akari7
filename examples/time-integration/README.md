@@ -12,6 +12,58 @@ B3向けに，常微分方程式で時間次数を確認し，同じ拡散問題
 行列組立てを学生の必須実装にはしません．
 既存N03や共通パッケージをinclude/importする必要はありません．
 
+## 新規フォルダだけの取得
+
+公開解説は[時間積分の精度・安定性・計算量](https://t2lab-it.github.io/thermofluid-exercise-2026/advanced/numerical-schemes.html)を参照してください．
+既存の`upstream`が授業の学生配布元を指すことを，共通の[配布元の更新手順](https://t2lab-it.github.io/thermofluid-exercise-2026/guides/workflow.html#material-updates)で確認します．
+学生リポジトリrootで，次のブロック全体をfishへ貼り付けます．
+既存の課題branchのまま実行でき，全体mergeやpackage環境更新は必要ありません．
+
+```{.fish #time-integration-fetch}
+function acquire_time_integration
+    set -l target examples/time-integration
+    set -l root (git rev-parse --show-toplevel)
+    or return 1
+    if test (pwd -P) != "$root"
+        echo '学生リポジトリのrootで実行してください．' >&2
+        return 1
+    end
+    if test -e "$target"; or test -L "$target"
+        echo '同名パスがあります．上書きせず中断します．' >&2
+        return 1
+    end
+    if test -n "$(git ls-files -- "$target")"
+        echo 'indexに同名パスがあります．差分を確認してください．' >&2
+        return 1
+    end
+    if test -L examples
+        echo 'examplesのリンク先へは取得しません．' >&2
+        return 1
+    end
+    if test -e examples; and not test -d examples
+        echo 'examplesの種類を確認してください．' >&2
+        return 1
+    end
+    git fetch --no-tags upstream main
+    or return 1
+    if test "$(git cat-file -t FETCH_HEAD:$target)" != tree
+        echo '配布元に対象フォルダがありません．' >&2
+        return 1
+    end
+    git restore --source=FETCH_HEAD --worktree -- "$target"
+end
+acquire_time_integration
+```
+
+この手順はworking treeだけへ新規フォルダを追加し，indexと既存の課題・学習ログ・進捗ファイルを変更しません．
+取得直後のフォルダは未追跡です．
+`git status --short`と`git diff --cached`で元の作業が保たれたことを確認してください．
+フォルダ・ファイル・リンクが既にある場合や，削除していてもindexに登録が残る場合は中断します．
+編集済みの例は差分を確認するか，リポジトリ外の別の保存先で比較し，この手順で上書きしないでください．
+この手順は初回の選択取得専用です．
+通常の課題開始・配布元更新は既存workflowを使い，将来の全体mergeではこの未追跡フォルダや自分の変更と競合する可能性があるため，事前に差分を確認します．
+無理に上書きするオプションは使いません．
+
 ## APIと実行
 
 右辺は`f(y,t)`です．
@@ -66,4 +118,3 @@ includeだけでは計算・表示・保存・進捗更新を行いません．
 `diffusion_problem`には格子・D・境界・初期モードと係数・固有値・参照の種類を，`diffusion`にはNと手法ごとのFo・時刻・モード係数履歴・初期／最終／参照分布・誤差・計算量を記録します．
 
 授業と既存課題は[公開N03授業](https://t2lab-it.github.io/thermofluid-exercise-2026/lessons/N03.html)と[公開N03課題](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N03.html)を参照してください．
-時間積分の公開解説・導線と，必要なexamplesだけの取得・復元手順はセッション2で整備します．
