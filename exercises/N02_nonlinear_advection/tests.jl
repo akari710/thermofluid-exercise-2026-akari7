@@ -17,7 +17,7 @@ using .N02NonlinearAdvection
         old = [1., 2., 1., 1.]
         saved = copy(old)
         new = similar(old)
-        nonlinear_upwind_step!(new, old, 0.25, 1.; boundary = :periodic)
+        nonlinear_upwind_step!(new, old, 0.25, 1.; boundary=:periodic)
         @test new == [1., 1.625, 1.375, 1.]
         @test old == saved
     end
@@ -39,8 +39,8 @@ using .N02NonlinearAdvection
             # c=1で同じ最終時刻まで移した矩形との離散L1差。周期では左右をつなぐ。
             shifted = [
                 0.5 <=
-                (boundary == :periodic ? mod(x - r.t_final, 2.) : x - r.t_final) <=
-                1.0 ? 2. : 1. for x in r.x
+                    (boundary == :periodic ? mod(x - r.t_final, 2.) : x - r.t_final) <=
+                    1.0 ? 2. : 1. for x in r.x
             ]
             @test r.dx * sum(abs.(r.u - shifted)) > 0.2
             @test maximum(r.u[findall(>(1.5), r.x)]) > 1.2
@@ -49,7 +49,68 @@ using .N02NonlinearAdvection
 end
 @testset "N02 自作テスト" begin
     # TODO(自作): 周期の非定数・非負配列を複数ステップ進め、離散総和保存を確認する。入力・許容誤差・期待値を自分で決める。
-    @test false
+    @testset "周期境界での総和保存" begin
+        # 非定数で，すべての値が0以上の配列を用意
+        u0 = [0.2, 1.0, 0.4, 0.0, 1.8, 0.7, 0.1, 0.5]
+
+        # 時間刻みと空間刻み
+        dt = 0.02
+        dx = 0.1
+
+        old = copy(u0)
+        new = similar(old)
+
+        # 複数ステップ計算する
+        for n in 1:20
+            nonlinear_upwind_step!(new, old, dt, dx; boundary=:periodic)
+            old, new = new, old
+        end
+
+        # 計算前後で総和が保存されることを確認
+        @test isapprox(
+            sum(old), sum(u0);
+            atol=1e-10,
+            rtol=1e-10
+        )
+    end
+
     # TODO(自作): 周期1ステップSについてS(circshift(u,k)) ≈ circshift(S(u),k)を確認する。非対称な非定数配列、k≠0、同じdtとdxを使う。
-    @test false
+    @testset "周期境界での平行移動対称性" begin
+        # 非対称な非定数配列
+        u = [0.2, 1.3, 0.0, 0.7, 2.1, 0.4, 0.9, 0.1]
+
+        # ずらす要素数
+        k = 3
+
+        # 両方の計算で同じ値を使う
+        dt = 0.02
+        dx = 0.1
+
+        # 先にずらしてから1ステップ計算する
+        shifted_u = circshift(u, k)
+        shifted_then_step = similar(u)
+
+        nonlinear_upwind_step!(
+            shifted_then_step, shifted_u, dt, dx;
+            boundary=:periodic
+        )
+
+        # 先に1ステップ計算してからずらす
+        stepped_u = similar(u)
+
+        nonlinear_upwind_step!(
+            stepped_u, u, dt, dx;
+            boundary=:periodic
+        )
+
+        step_then_shifted = circshift(stepped_u, k)
+
+        # 二つの結果が一致することを確認
+        @test isapprox(
+            shifted_then_step, step_then_shifted;
+            atol=1e-10,
+            rtol=1e-10
+        )
+    end
+
 end

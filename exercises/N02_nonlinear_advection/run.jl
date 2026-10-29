@@ -28,7 +28,7 @@ N02授業の保存形Burgers流束を、配列全体ではなく1点のスカラ
 function burgers_flux(u::Real)
     isfinite(u) || throw(ArgumentError("流束の入力を有限値にしてください"))
     # TODO(N02): 保存形Burgers方程式の流束を返す。
-    error("未実装 N02: burgers_flux")
+    return u^2 / 2
 end
 
 """
@@ -56,7 +56,8 @@ function periodic_left_index(i::Integer, n::Integer)
     (i isa Bool || n isa Bool || n < 1 || !(1 <= i <= n)) &&
         throw(ArgumentError("添字は1 <= i <= n、点数はn >= 1の整数です（Bool不可）"))
     # TODO(N02): 先頭の左隣が末尾になるようにする。
-    error("未実装 N02: periodic_left_index")
+    return i == 1 ? n : i - 1
+    # 条件 ? A : B は，条件が真ならA、偽ならBを返す．
 end
 
 """
@@ -84,15 +85,18 @@ end
 検証、旧場のコピー、境界別の更新範囲と左隣添字は提供済み。固定境界の両端は旧値を保ち、周期境界は全点を更新する。
 新旧は同じ記憶領域を共有せず、全点で更新前の値を読む。N02授業の保存形更新を参照する。配布状態では更新範囲内の未実装エラーで停止する。
 """
-function nonlinear_upwind_step!(u_new, u_old, dt::Real, dx::Real; boundary = :fixed)
+function nonlinear_upwind_step!(u_new, u_old, dt::Real, dx::Real; boundary=:fixed)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_step_inputs(u_new, u_old, dt, dx, boundary)
     copyto!(u_new, u_old)
-    indices = boundary == :periodic ? (1:length(u_old)) : (2:(length(u_old) - 1))
+    indices = boundary == :periodic ? (1:length(u_old)) : (2:(length(u_old)-1))
     for i in indices
         left = boundary == :periodic ? periodic_left_index(i, length(u_old)) : i - 1
         # TODO(N02): 古い値の流束の差で更新する。u_oldは変更しない。
-        error("未実装 N02: nonlinear_upwind_step!")
+        # 旧配列の現在点と左隣の流束から更新する
+        u_new[i] = u_old[i] - (dt / dx) * (
+            burgers_flux(u_old[i]) - burgers_flux(u_old[left])
+        )
     end
     all(isfinite, u_new) || error("更新後に非有限値があります。更新式を確認してください")
     return u_new
@@ -114,13 +118,13 @@ end
 
 入力 `u`。固定の場合は左端を1、右端を左隣の値に書き換える。
 """
-function apply_boundary!(u; boundary = :fixed)
+function apply_boundary!(u; boundary=:fixed)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_boundary(boundary)
     length(u) >= 3 || throw(ArgumentError("境界配列には3点以上が必要です"))
     if boundary == :fixed
         u[1] = 1.0
-        u[end] = u[end - 1]
+        u[end] = u[end-1]
     end
     return u
 end
@@ -149,17 +153,17 @@ end
 座標 `x`、独立した初期値 `u0` と最終値 `u`、刻み・ステップ数・最大CFL、極値・超過量・和の変化を持つ `NamedTuple`。
 """
 function simulate(;
-    boundary = :fixed,
-    nx::Integer = 81,
-    cfl::Real = 0.5,
-    t_final::Real = 1.0,
+    boundary=:fixed,
+    nx::Integer=81,
+    cfl::Real=0.5,
+    t_final::Real=1.0,
 )
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_simulation_inputs(boundary, nx, cfl, t_final)
 
     # 座標と格子幅を用意し、配列の添字との対応をそろえる。
     dx = 2.0 / (boundary == :fixed ? nx - 1 : nx)
-    x = [j * dx for j in 0:(nx - 1)]
+    x = [j * dx for j in 0:(nx-1)]
     u0 = [0.5 <= xi <= 1.0 ? 2.0 : 1.0 for xi in x]
 
     # 安定上限と到達する時刻に合わせて時間刻みを決める。
@@ -187,7 +191,7 @@ function simulate(;
     return (;
         x,
         u0,
-        u = u_old,
+        u=u_old,
         dx,
         dt,
         steps,
@@ -195,13 +199,13 @@ function simulate(;
         t_final,
         initial_minimum,
         initial_maximum,
-        minimum = low,
-        maximum = high,
-        overshoot = max(high - initial_maximum, 0.0),
-        undershoot = max(initial_minimum - low, 0.0),
-        initial_sum = sum(u0),
-        final_sum = sum(u_old),
-        sum_change = sum(u_old) - sum(u0),
+        minimum=low,
+        maximum=high,
+        overshoot=max(high - initial_maximum, 0.0),
+        undershoot=max(initial_minimum - low, 0.0),
+        initial_sum=sum(u0),
+        final_sum=sum(u_old),
+        sum_change=sum(u_old) - sum(u0),
     )
 end
 
@@ -225,12 +229,12 @@ end
 `fixed` と `periodic` の計算結果を持つ `NamedTuple`。図2枚と `summary.toml` を保存する。
 """
 function main(;
-    output_dir::AbstractString = DEFAULT_OUTPUT_DIR,
-    cfl::Real = 0.5,
-    t_final::Real = 1.0,
+    output_dir::AbstractString=DEFAULT_OUTPUT_DIR,
+    cfl::Real=0.5,
+    t_final::Real=1.0,
 )
-    fixed = simulate(; boundary = :fixed, nx = 81, cfl, t_final)
-    periodic = simulate(; boundary = :periodic, nx = 80, cfl, t_final)
+    fixed = simulate(; boundary=:fixed, nx=81, cfl, t_final)
+    periodic = simulate(; boundary=:periodic, nx=80, cfl, t_final)
     write_outputs(output_dir, fixed, periodic, cfl, t_final)
     println("N02の出力を書き込みました: $(abspath(output_dir))")
 
