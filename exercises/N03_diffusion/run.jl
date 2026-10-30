@@ -26,7 +26,7 @@ export initial_condition, analytic_solution, apply_boundary!, diffusion_step!, t
 
 `x` の各座標に対応する初期温度の配列。入力の `x` は変更しない。
 """
-function initial_condition(x; initial = :pulse, boundary = :fixed)
+function initial_condition(x; initial=:pulse, boundary=:fixed)
     # 初期条件と境界の指定、座標の有限性を確認する。
     validate_boundary(boundary)
     validate_initial(initial)
@@ -56,7 +56,7 @@ end
 `x` の各座標に対応する時刻 `t` の解析解の配列。入力の `x` は変更しない。
 境界条件に適合するモードの解であり、矩形初期値 `initial=:pulse` に対する解ではない。
 """
-function analytic_solution(x, t::Real; boundary = :fixed, diffusivity::Real = 0.1)
+function analytic_solution(x, t::Real; boundary=:fixed, diffusivity::Real=0.1)
     # 解析解を評価できる境界条件、拡散係数、時刻、座標を確認する。
     validate_boundary(boundary)
     positive_finite(diffusivity, "diffusivity")
@@ -66,7 +66,7 @@ function analytic_solution(x, t::Real; boundary = :fixed, diffusivity::Real = 0.
     # 時間による振幅の減衰と、境界に適合する空間分布を組み合わせる。
     amplitude = exp(-diffusivity * (pi / 2)^2 * t)
     return boundary == :fixed ? amplitude .* sin.(pi .* x ./ 2) :
-        0.5 .+ 0.5 .* amplitude .* cos.(pi .* x ./ 2)
+           0.5 .+ 0.5 .* amplitude .* cos.(pi .* x ./ 2)
 end
 
 """
@@ -94,7 +94,7 @@ end
 固定温度の処理は提供済み。
 配布時は、断熱条件を選ぶと `未実装 N03: apply_boundary!` のエラーで停止する。
 """
-function apply_boundary!(u_new, u_old, r::Real; boundary = :fixed)
+function apply_boundary!(u_new, u_old, r::Real; boundary=:fixed)
     # 境界を書き込む前に、新旧配列と実効Fourier数を確認する。
     validate_buffers(u_new, u_old, boundary)
     positive_finite(r, "r")
@@ -105,7 +105,8 @@ function apply_boundary!(u_new, u_old, r::Real; boundary = :fixed)
         u_new[end] = 0.0
     else
         # TODO(N03): 旧配列を用い、半セルに対応する係数で両端を更新する。
-        error("未実装 N03: apply_boundary!")
+        u_new[1] = u_old[1] + 2 * r * (u_old[2] - u_old[1])
+        u_new[end] = u_old[end] + 2 * r * (u_old[end-1] - u_old[end])
     end
 
     return u_new
@@ -140,7 +141,7 @@ end
 配布時は、内部点の更新で `未実装 N03: diffusion_step!` のエラーにより停止する。
 """
 function diffusion_step!(
-    u_new, u_old, dt::Real, dx::Real, diffusivity::Real; boundary = :fixed,
+    u_new, u_old, dt::Real, dx::Real, diffusivity::Real; boundary=:fixed,
 )
     # 配列の独立性と、刻み・格子幅・拡散係数を確認する。
     validate_buffers(u_new, u_old, boundary)
@@ -153,9 +154,9 @@ function diffusion_step!(
     positive_finite(r, "実効Fourier数")
 
     # 内部点はすべて同じ旧配列から更新する。
-    for i in 2:length(u_old)-1
+    for i in 2:(length(u_old)-1)
         # TODO(N03): 旧配列だけから内部点の次時刻値を計算する。
-        error("未実装 N03: diffusion_step!")
+        u_new[i] = u_old[i] + r * (u_old[i+1] - 2 * u_old[i] + u_old[i-1])
     end
 
     # 内部点の後で両端を更新し、次時刻の温度配列を完成させる。
@@ -193,7 +194,7 @@ function thermal_content(u, dx::Real)
     positive_finite(dx, "dx")
 
     # TODO(N03): 台形則の積分を返す。
-    error("未実装 N03: thermal_content")
+    return dx * (u[1] / 2 + sum(u[2:(end-1)]) + u[end] / 2)
 end
 
 """
@@ -231,13 +232,13 @@ end
 - `minimum`, `maximum`: 初期時刻を含む全時刻を通した温度の最小値と最大値。
 """
 function simulate(;
-    boundary = :fixed, nx::Integer = 81, diffusivity::Real = 0.1,
-    fo::Real = 0.4, t_final::Real = 1.0, initial = :pulse,
+    boundary=:fixed, nx::Integer=81, diffusivity::Real=0.1,
+    fo::Real=0.4, t_final::Real=1.0, initial=:pulse,
 )
     # 計算条件を確認し、両端を含む格子と初期温度を用意する。
     validate_simulation_inputs(boundary, nx, diffusivity, fo, t_final, initial)
     dx = 2.0 / (nx - 1)
-    x = [j * dx for j in 0:nx-1]
+    x = [j * dx for j in 0:(nx-1)]
     u0 = initial_condition(x; initial, boundary)
 
     # 正弦の浮動小数丸めも含め、固定端を正確に0へ揃える。
@@ -266,7 +267,7 @@ function simulate(;
     initial_minimum, initial_maximum = extrema(u0)
     low, high = initial_minimum, initial_maximum
     ensure_finite((initial_heat, low, high), 0, 0., effective_fo)
-    times = collect(range(0., t_final; length = steps + 1))
+    times = collect(range(0., t_final; length=steps + 1))
     heat_history = Vector{Float64}(undef, steps + 1)
     heat_history[1] = initial_heat
 
@@ -292,9 +293,9 @@ function simulate(;
     heat_change = final_heat - initial_heat
     ensure_finite((heat_change,), steps, t_final, effective_fo)
     return (;
-        x, u0, u = u_old, dx, dt, steps, fo = effective_fo, requested_fo = fo, t_final,
+        x, u0, u=u_old, dx, dt, steps, fo=effective_fo, requested_fo=fo, t_final,
         diffusivity, times, heat_history, initial_heat, final_heat, heat_change,
-        initial_minimum, initial_maximum, minimum = low, maximum = high,
+        initial_minimum, initial_maximum, minimum=low, maximum=high,
     )
 end
 
@@ -317,10 +318,10 @@ end
 `fixed` と `insulated` は各境界条件の `simulate` の結果、`convergence` は格子収束の診断辞書。
 出力先に温度比較・熱量履歴・収束のPNGと `summary.toml` を保存する。
 """
-function main(; output_dir::AbstractString = DEFAULT_OUTPUT_DIR)
+function main(; output_dir::AbstractString=DEFAULT_OUTPUT_DIR)
     # 固定温度・断熱の標準計算と、解析解に対する格子収束を求める。
     fixed = simulate()
-    insulated = simulate(; boundary = :insulated)
+    insulated = simulate(; boundary=:insulated)
     convergence = convergence_results()
 
     # 診断と図を生成・検査してから、指定された出力先へ保存する。
@@ -352,14 +353,14 @@ end
 出力先に `stability-comparison.png` と `summary.toml` を保存する。
 """
 function stability_experiment(;
-    output_dir::AbstractString, fo::Real = 0.6, t_final::Real = 0.1,
+    output_dir::AbstractString, fo::Real=0.6, t_final::Real=0.1,
 )
     # 指定値が不安定条件になることを確認する。
     isfinite(fo) && fo > 0.5 ||
         throw(ArgumentError("比較用foは有限で0.5より大きくしてください"))
 
     # 安定条件と不安定条件を、同じ初期値・境界・終了時刻で比較する。
-    stable = simulate(; fo = 0.4, t_final)
+    stable = simulate(; fo=0.4, t_final)
     unstable = simulate(; fo, t_final)
     unstable.fo > 0.5 || throw(ArgumentError(
         "最終時刻への調整後の実効foが0.5以下です。安定条件超過の比較になるよう条件を調整してください",
