@@ -1,7 +1,7 @@
 # N04: SELECTED_MODELを選び、選択流束・合成刻み・周期更新の3か所を実装する。
 # 読む順: 流束 → 刻み → 1ステップ → simulate → main。入力検証・解析解・描画は提供済み。
 module N04AdvectionDiffusion
-const SELECTED_MODEL = :unselected
+const SELECTED_MODEL = :linear
 include("provided_support.jl")
 export SELECTED_MODEL,
     advective_flux,
@@ -35,18 +35,18 @@ export SELECTED_MODEL,
 SELECTED_MODELで選んだ枝だけに、N01の線形流束またはN02のBurgers流束を移す。スカラー1点の入力を扱う。
 モデル・有限性・速度の検証は提供済み。配布状態の `:unselected` はモデル検証で拒否され、選択済みの枝も未完成なら既存の未実装エラーで停止する。
 """
-function advective_flux(u; model = SELECTED_MODEL, speed = 1.0)
+function advective_flux(u; model=SELECTED_MODEL, speed=1.0)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_model(model)
     finite_real(u, "u")
     validate_speed(model, speed)
     if model == :linear
         # TODO(N04): 線形を選んだ場合だけ実装する。
-        error("未実装 N04: advective_flux (linear)")
+        return speed * u
     else
         nonnegative_finite(u, "非線形移流のu")
         # TODO(N04): 非線形を選んだ場合だけ実装する。
-        error("未実装 N04: advective_flux (nonlinear)")
+        return u^2 / 2
     end
 end
 
@@ -73,10 +73,10 @@ end
 移流と拡散を別々に制限するのでなく、両者の寄与を足した安定上限にsafetyを適用して刻みを返す。
 入力検証は提供済み。[N04課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N04.html#discretization)を参照する。配布状態では検証後に未実装エラーで停止する。
 """
-function stable_timestep(max_speed, dx, diffusivity; safety = 0.8)
+function stable_timestep(max_speed, dx, diffusivity; safety=0.8)
     validate_timestep_inputs(max_speed, dx, diffusivity, safety)
     # TODO(N04): 合成条件から刻みを返す。
-    error("未実装 N04: stable_timestep")
+    return safety / (max_speed / dx + 2 * diffusivity / dx^2)
 end
 
 """
@@ -122,15 +122,26 @@ function advection_diffusion_step!(
     dt,
     dx,
     diffusivity;
-    model = SELECTED_MODEL,
-    advection = true,
-    speed = 1.0,
+    model=SELECTED_MODEL,
+    advection=true,
+    speed=1.0,
 )
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_step(u_new, u_old, dt, dx, diffusivity, model, advection, speed)
     for i in eachindex(u_old)
         # TODO(N04): 周期の左右隣接を使い、移流と拡散を同じ旧配列から足す。
-        error("未実装 N04: advection_diffusion_step!")
+        left = i == 1 ? length(u_old) : i-1
+        right = i == length(u_old) ? 1 : i+1
+
+        advection_term = 0.0
+        if advection
+            advection_term = -(dt / dx) * (advective_flux(u_old[i]; model, speed) - advective_flux(u_old[left]; model, speed))
+        end
+
+        diffusion_term = diffusivity * dt / dx^2 * (u_old[right] - 2 * u_old[i] + u_old[left])
+
+        u_new[i] = u_old[i] + advection_term + diffusion_term
+
     end
     return u_new
 end
@@ -169,22 +180,22 @@ end
 `x, u0, u`、モデル・条件、格子/刻み、時刻と積分履歴、初期/最終積分・極値・最大CFL・Fo・合成安定数を持つ `NamedTuple`。
 """
 function simulate(;
-    model = SELECTED_MODEL,
-    advection = true,
-    nx = 80,
-    diffusivity = 0.1,
-    speed = 1.0,
-    safety = 0.8,
-    t_final = 1.0,
-    initial = :pulse,
-    dt = nothing,
+    model=SELECTED_MODEL,
+    advection=true,
+    nx=80,
+    diffusivity=0.1,
+    speed=1.0,
+    safety=0.8,
+    t_final=1.0,
+    initial=:pulse,
+    dt=nothing,
 )
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_simulation(model, advection, nx, diffusivity, speed, safety, t_final, initial)
 
     # 座標と格子幅を用意し、配列の添字との対応をそろえる。
     dx = 2.0 / nx
-    x = [j * dx for j in 0:(nx - 1)]
+    x = [j * dx for j in 0:(nx-1)]
 
     # 初期値を保持し、更新に使う作業用配列を用意する。
     u0 = initial_condition(x; model, initial, diffusivity, speed)
@@ -209,7 +220,7 @@ function simulate(;
     # 初期値を保持し、更新に使う作業用配列を用意する。
     u_old = copy(u0)
     u_new = similar(u_old)
-    times = collect(range(0., t_final; length = steps + 1))
+    times = collect(range(0., t_final; length=steps + 1))
     integral_history = Vector{Float64}(undef, steps + 1)
 
     # 初期値を基準にして、保存量や停止条件の診断を準備する。
@@ -232,10 +243,10 @@ function simulate(;
             advection,
             speed,
         )
-        ensure_finite(u_new, model, step, times[step + 1], cfl, fo)
+        ensure_finite(u_new, model, step, times[step+1], cfl, fo)
         integral = dx * sum(u_new)
-        ensure_finite((integral,), model, step, times[step + 1], cfl, fo)
-        integral_history[step + 1] = integral
+        ensure_finite((integral,), model, step, times[step+1], cfl, fo)
+        integral_history[step+1] = integral
         low = min(low, minimum(u_new))
         high = max(high, maximum(u_new))
         a = maximum_speed(u_new, model, advection, speed)
@@ -261,7 +272,7 @@ function simulate(;
     return (;
         x,
         u0,
-        u = u_old,
+        u=u_old,
         model,
         advection,
         initial,
@@ -271,14 +282,14 @@ function simulate(;
         dt,
         steps,
         t_final,
-        requested_safety = safety,
+        requested_safety=safety,
         times,
         integral_history,
         initial_integral,
         final_integral,
         integral_change,
-        minimum = low,
-        maximum = high,
+        minimum=low,
+        maximum=high,
         max_cfl,
         fo,
         max_stability_number,
@@ -299,12 +310,12 @@ end
 
 `advection_only, diffusion_only, combined, convergence` を持つ `NamedTuple`。`output_dir/<model>/` に図3枚と診断TOMLを保存する。
 """
-function main(; model = SELECTED_MODEL, output_dir = DEFAULT_OUTPUT_DIR)
+function main(; model=SELECTED_MODEL, output_dir=DEFAULT_OUTPUT_DIR)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     validate_model(model)
     combined = simulate(; model)
-    advection_only = simulate(; model, diffusivity = 0., dt = combined.dt)
-    diffusion_only = simulate(; model, advection = false, dt = combined.dt)
+    advection_only = simulate(; model, diffusivity=0., dt=combined.dt)
+    diffusion_only = simulate(; model, advection=false, dt=combined.dt)
     convergence = convergence_results(model)
     write_outputs(output_dir, advection_only, diffusion_only, combined, convergence)
     println("N04の出力を書き込みました: $(abspath(joinpath(output_dir,string(model))))")
