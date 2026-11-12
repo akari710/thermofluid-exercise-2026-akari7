@@ -71,7 +71,7 @@ end
 x,y方向の移流の寄与を足した合成CFL上限へsafetyを適用し、時間刻みを求める。
 入力検証と計算後のFloat64変換・有限正値の検証は提供済み。[N06課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N06.html#discretization)を参照する。配布状態では刻みの未実装エラーで停止する。
 """
-function stable_timestep(cx, cy, dx, dy; safety = 0.8)
+function stable_timestep(cx, cy, dx, dy; safety=0.8)
     # 計算や書込みの前に、入力条件をまとめて確認する。
     speeds(cx, cy)
     positive(dx, "dx")
@@ -80,7 +80,7 @@ function stable_timestep(cx, cy, dx, dy; safety = 0.8)
     safety <= 1 && (cx > 0 || cy > 0) ||
         throw(ArgumentError("safety<=1、少なくとも一方の速度は正です"))
     # TODO(N06): 方向別寄与を足した安定条件から刻みを求める。
-    dt = error("未実装 N06: stable_timestep")
+    dt = safety / (cx / dx + cy / dy)
 
     # 計算した刻みが元の型でもFloat64でも有限な正値か確認する。
     positive(dt, "合成dt（表現範囲）")
@@ -118,7 +118,7 @@ end
 新旧は同じ記憶領域を共有しない。Common.validate_buffersと周期添字・流束の共通APIを実装してから利用する。
 速度・刻み・合成CFLの検証、格子点数nx,nyの取得は提供済み。[N06課題「離散化と時間刻み」](https://t2lab-it.github.io/thermofluid-exercise-2026/assignments/N06.html#discretization)を参照する。配布状態では共通検証または更新の未実装エラーで停止する。
 """
-function advection_step!(u_new, u_old, dt, dx, dy; cx = 1.0, cy = 0.5)
+function advection_step!(u_new, u_old, dt, dx, dy; cx=1.0, cy=0.5)
     u_new isa AbstractMatrix && u_old isa AbstractMatrix ||
         throw(ArgumentError("新旧は行列です"))
     Common.validate_buffers(u_new, u_old)
@@ -134,7 +134,18 @@ function advection_step!(u_new, u_old, dt, dx, dy; cx = 1.0, cy = 0.5)
         throw(ArgumentError("合成CFL<=1を超えています: Cx=$Cx, Cy=$Cy"))
     nx, ny = size(u_old)
     # TODO(N06): 両方向の周期隣接と流束を使い、全点を旧配列だけから更新する。
-    error("未実装 N06: advection_step!")
+    for j in 1:ny, i in 1:nx
+        im = Common.periodic_left_index(i, nx)
+        jm = Common.periodic_left_index(j, ny)
+
+        u = u_old[i, j]
+        flux_x = Common.linear_flux(u, cx) -
+            Common.linear_flux(u_old[im, j], cx)
+        flux_y = Common.linear_flux(u, cy) -
+            Common.linear_flux(u_old[i, jm], cy)
+
+        u_new[i, j] = u - (dt / dx) * flux_x - (dt / dy) * flux_y
+    end
     return u_new
 end
 end
