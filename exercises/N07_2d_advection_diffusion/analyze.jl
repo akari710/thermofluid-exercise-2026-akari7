@@ -31,7 +31,16 @@ include("provided_support.jl")
 function heat_budget(time, heat, advective_integrals, diffusive_integrals)
     validate_budget(time, heat, advective_integrals, diffusive_integrals)
     # TODO(N07): 各区間の正味流入、累積流入、初期熱量からの変化との差を求める。
-    error("未実装 N07: heat_budget")
+    # 各列（保存区間）について，4辺の移流・拡散の熱輸送量を合計する
+    net_input = vec(sum(advective_integrals + diffusive_integrals; dims=1))
+
+    # 初期時刻では累積流入量が0なので，先頭に0を入れる
+    cumulative_input = vcat(zero(eltype(net_input)), cumsum(net_input))
+
+    # 各保存時刻の熱量変化から，同じ時刻までの累積流入量を引く
+    residual = (heat .- first(heat)) .- cumulative_input
+
+    return (; net_input, cumulative_input, residual)
 end
 
 """
@@ -56,9 +65,9 @@ end
 解析辞書。source_sha256を記録してsummary.tomlを復元付きで反映する。熱収支TODOの失敗では既存解析を保持する。
 """
 function main(;
-    input_dir = DEFAULT_OUTPUT_DIR,
-    output_dir = DEFAULT_OUTPUT_DIR,
-    budget = heat_budget,
+    input_dir=DEFAULT_OUTPUT_DIR,
+    output_dir=DEFAULT_OUTPUT_DIR,
+    budget=heat_budget,
     publish_options...,
 )
     # 保存済みの値と出自を検証してから、解析や作図に使う。
