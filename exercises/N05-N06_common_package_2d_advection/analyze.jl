@@ -24,7 +24,14 @@ function spatial_variance(u)
     # TODO(N06): 保存場の平均を使って空間分散を求める。
     # 段階実行の例外: 基本診断は保存し、diagnostics_complete=falseで未完成を示す。
     # 分散が完成するまで作図と必修完了検査は失敗する。
-    return nothing
+    n = length(u)
+    u_mean = sum(u) / n
+    squared_sum = 0.0
+    for value in u
+        squared_sum += (value - u_mean)^2
+    end
+    variance = squared_sum / n
+    return Float64(variance)
 end
 
 """
@@ -49,9 +56,9 @@ end
 解析辞書。source_fields_sha256を記録し、summary.tomlを復元付きで反映する。未完成の分散は省く。
 """
 function main(;
-    input_path = joinpath(DEFAULT_OUTPUT_DIR, FIELD_NAME),
-    output_dir = DEFAULT_OUTPUT_DIR,
-    variance = spatial_variance,
+    input_path=joinpath(DEFAULT_OUTPUT_DIR, FIELD_NAME),
+    output_dir=DEFAULT_OUTPUT_DIR,
+    variance=spatial_variance,
     publish_options...,
 )
     # 保存済みの値と出自を検証してから、解析や作図に使う。
